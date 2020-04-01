@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import unittest
-import yaml
 import sys
 sys.path.append('lib')  # noqa
 sys.path.append('src')  # noqa
@@ -22,12 +21,6 @@ class TestCharmClass(CharmBase):
 
 
 class TestCockroachDBCluster(unittest.TestCase):
-
-    realData = yaml.safe_load('''
-ingress-address: 10.210.24.14
-cluster_id: 9801e1d9-92e0-4d6a-aa25-fd0e8b236cfe
-initial_unit: cockroachdb/0
-''')
 
     def setUp(self):
         self.harness = testing.Harness(TestCharmClass, meta='''
