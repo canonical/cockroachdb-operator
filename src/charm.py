@@ -6,7 +6,7 @@ import socket
 import re
 import pwd
 import sys
-sys.path.append('lib')
+sys.path.append('lib')  # noqa
 
 from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase, EventSource, StoredState
@@ -89,20 +89,24 @@ class CockroachDBCharm(CharmBase):
         if resource_path is None:
             ARCHITECTURE = 'amd64'  # hard-coded until it becomes important
             version = self.model.config['version']
-            cmd = (f'wget -qO- https://binaries.cockroachdb.com/cockroach-{version}.linux-{ARCHITECTURE}.tgz'
-                   f'| tar -C {self.COCKROACH_INSTALL_DIR} -xvz --wildcards --strip-components 1 --no-anchored "cockroach*/cockroach"')
+            cmd = (f'wget -qO- https://binaries.cockroachdb.com/'
+                   f'cockroach-{version}.linux-{ARCHITECTURE}.tgz'
+                   f'| tar -C {self.COCKROACH_INSTALL_DIR} -xvz --wildcards'
+                   ' --strip-components 1 --no-anchored "cockroach*/cockroach"')
             subprocess.check_call(cmd, shell=True)
             os.chown(self.COCKROACH_BINARY_PATH, 0, 0)
         else:
             cmd = ['tar', '-C', self.COCKROACH_INSTALL_DIR, '-xv', '--wildcards',
-                   '--strip-components', '1', '--no-anchored', 'cockroach*/cockroach', '-zf', str(resource_path)]
+                   '--strip-components', '1', '--no-anchored', 'cockroach*/cockroach',
+                   '-zf', str(resource_path)]
             subprocess.check_call(cmd)
 
         self._setup_systemd_service()
 
     @property
     def is_single_node(self):
-        """Both replication factors were set to 1 so it's a good guess that an operator wants a 1-node deployment."""
+        """Both replication factors were set to 1 so it's a good guess that an operator wants
+        a 1-node deployment."""
         default_zone_rf = self.model.config['default-zone-replicas']
         system_data_rf = self.model.config['system-data-replicas']
         return default_zone_rf == 1 and system_data_rf == 1
@@ -110,7 +114,8 @@ class CockroachDBCharm(CharmBase):
     def _setup_systemd_service(self):
         if self.is_single_node:
             # start-single-node will set replication factors for all zones to 1.
-            exec_start_line = f'ExecStart={self.COCKROACH_BINARY_PATH} start-single-node --advertise-addr {self.cluster.advertise_addr} --insecure'
+            exec_start_line = (f'ExecStart={self.COCKROACH_BINARY_PATH} start-single-node'
+                               ' --advertise-addr {self.cluster.advertise_addr} --insecure')
         else:
             peer_addresses = [self.cluster.advertise_addr]
             if self.cluster.is_joined:
@@ -141,7 +146,13 @@ class CockroachDBCharm(CharmBase):
             try:
                 pwd.getpwnam(self.COCKROACH_USERNAME)
             except KeyError:
-                subprocess.check_call(['useradd', '-m', '--home-dir', self.WORKING_DIRECTORY, '--shell', '/usr/sbin/nologin', self.COCKROACH_USERNAME])
+                subprocess.check_call(['useradd',
+                                       '-m',
+                                       '--home-dir',
+                                       self.WORKING_DIRECTORY,
+                                       '--shell',
+                                       '/usr/sbin/nologin',
+                                       self.COCKROACH_USERNAME])
 
             if self.state.is_started:
                 subprocess.check_call(['systemctl', 'restart', f'{self.COCKROACHDB_SERVICE}'])
@@ -152,7 +163,8 @@ class CockroachDBCharm(CharmBase):
         # don't start the process if the cluster has already been initialized.
         # This configuration is not practical in real deployments (i.e. multiple units, RF=1).
         initial_unit = self.cluster.initial_unit
-        if self.is_single_node and (initial_unit is not None and self.model.unit.name != initial_unit):
+        if self.is_single_node and (
+                initial_unit is not None and self.model.unit.name != initial_unit):
             unit.status = BlockedStatus('Extra unit in a single-node deployment.')
             return
         subprocess.check_call(['systemctl', 'start', f'{self.COCKROACHDB_SERVICE}'])
@@ -179,13 +191,14 @@ class CockroachDBCharm(CharmBase):
             self.unit.status = ActiveStatus()
             return
         elif not self.unit.is_leader():
-            self.unit.status = WaitingStatus('Waiting for the leader unit to initialize a cluster.')
+            self.unit.status = WaitingStatus(
+                'Waiting for the leader unit to initialize a cluster.')
             event.defer()
             return
 
         self.unit.status = MaintenanceStatus('Initializing the cluster')
-        # Initialize the cluster if we're a leader in a multi-node deployment, otherwise it have already
-        # been initialized by running start-single-node.
+        # Initialize the cluster if we're a leader in a multi-node deployment, otherwise it have
+        # already been initialized by running start-single-node.
         if not self.is_single_node and self.model.unit.is_leader():
             subprocess.check_call([self.COCKROACH_BINARY_PATH, 'init', '--insecure'])
 
@@ -194,16 +207,19 @@ class CockroachDBCharm(CharmBase):
 
     def __get_cluster_id(self):
         for _ in range(self.MAX_RETRIES):
-            res = subprocess.run([self.COCKROACH_BINARY_PATH, 'debug', 'gossip-values', '--insecure'],
-                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            res = subprocess.run([self.COCKROACH_BINARY_PATH, 'debug', 'gossip-values',
+                                  '--insecure'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             if not res.returncode:
                 out = res.stdout.decode('utf-8')
                 break
-            elif not re.findall(r'code = Unavailable desc = node waiting for init', res.stderr.decode('utf-8')):
-                raise RuntimeError('unexpected error returned while trying to obtain gossip-values')
+            elif not re.findall(r'code = Unavailable desc = node waiting for init',
+                                res.stderr.decode('utf-8')):
+                raise RuntimeError(
+                    'unexpected error returned while trying to obtain gossip-values')
             sleep(self.RETRY_TIMEOUT.total_seconds())
 
-        cluster_id_regex = re.compile(r'"cluster-id": (?P<uuid>[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12})$')
+        cluster_id_regex = re.compile(r'"cluster-id": (?P<uuid>[0-9a-fA-F]{8}\-[0-9a-fA-F]'
+                                      r'{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12})$')
         for line in out.split('\n'):
             m = cluster_id_regex.match(line)
             if m:
@@ -211,7 +227,8 @@ class CockroachDBCharm(CharmBase):
         raise RuntimeError('could not find cluster-id in the gossip-values output')
 
     def on_config_changed(self, event):
-        # TODO: handle configuration changes to replication factors and apply them via cockroach sql.
+        # TODO: handle configuration changes to replication factors and apply them
+        # via cockroach sql.
         pass
 
     def on_proxy_listen_tcp_relation_joined(self, event):
@@ -230,7 +247,8 @@ class CockroachDBCharm(CharmBase):
             'option tcplog',
         ]
         fqdn = socket.getnameinfo((str(self.cluster.advertise_addr), 0), socket.NI_NAMEREQD)[0]
-        server_option = f'server {fqdn} {self.cluster.advertise_addr}:{self.PSQL_PORT} check port {self.HTTP_PORT}'
+        server_option = (f'server {fqdn} {self.cluster.advertise_addr}:{self.PSQL_PORT}'
+                         ' check port {self.HTTP_PORT}')
         self.tcp_load_balancer.expose_server(self.PSQL_PORT, listen_options, server_option)
 
 
