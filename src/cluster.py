@@ -3,23 +3,21 @@ from ops.framework import Object, StoredState
 
 class CockroachDBCluster(Object):
 
-    state = StoredState()
+    stored = StoredState()
 
     def __init__(self, charm, relation_name):
         super().__init__(charm, relation_name)
         self._relation_name = relation_name
-        self._relation = self.framework.model.get_relation(self._relation_name)
         self.framework.observe(charm.on.cluster_initialized, self)
-
-        self.state.set_default(cluster_id=None)
+        self.stored.set_default(cluster_id=None)
 
     @property
-    def _relations(self):
-        return self.framework.model.relations[self._relation_name]
+    def _relation(self):
+        return self.framework.model.get_relation(self._relation_name)
 
     @property
     def is_single(self):
-        return len(self._relations) == 1
+        return len(self.framework.model.relations[self._relation_name]) == 1
 
     @property
     def is_joined(self):
@@ -30,20 +28,20 @@ class CockroachDBCluster(Object):
             raise RuntimeError('The initial unit of a cluster must also be a leader.')
 
         # A workaround for LP: #1859769.
-        self.state.cluster_id = event.cluster_id
+        self.stored.cluster_id = event.cluster_id
         if not self.is_joined:
             event.defer()
             return
 
         self._relation.data[self.model.app]['initial_unit'] = self.framework.model.unit.name
-        self._relation.data[self.model.app]['cluster_id'] = self.state.cluster_id
+        self._relation.data[self.model.app]['cluster_id'] = self.stored.cluster_id
 
     @property
     def is_cluster_initialized(self):
         """Determined by the presence of a cluster ID."""
         if self.is_joined:
             return self._relation.data[self.model.app].get('cluster_id') is not None
-        elif self.state.cluster_id:
+        elif self.stored.cluster_id:
             return True
         else:
             return False
