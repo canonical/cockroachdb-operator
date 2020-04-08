@@ -7,7 +7,7 @@ This charm provides means to deploy and operate cockroachdb - a scalable, cloud-
 
 # Deployment Requirements
 
-The charm requires Juju 2.7.5 to be present (see [LP: #1865229](https://bugs.launchpad.net/juju/+bug/1865229)).
+The charm requires Juju 2.7.5 or above (see [LP: #1865229](https://bugs.launchpad.net/juju/+bug/1865229)).
 
 # Deployment
 
@@ -21,7 +21,7 @@ CockroachDB will use a replication factor of 3 unless explicitly specified.
 
 ```bash
 juju deploy <charm-src-dir>
-juju add-unit cockroachdb -n 2
+juju add-unit cockroachdb -n 3
 ```
 
 HA with an explicit amount of replicas.
@@ -40,18 +40,6 @@ cockroach sql
 # Web UI
 
 The web UI is accessible at `https://<unit-ip>:8080`
-
-# Using Haproxy as a Load-balancer
-
-An app deployed by this charm can be related to [charm-haproxy](https://github.com/dshcherb/charm-haproxy):
-
-```bash
-juju deploy <cockroachdb-charm-src-dir> --config default-zone-replicas=3 --config system-data-replicas=3 -n 3
-juju deploy <haproxy-charm-src-dir>
-juju relate haproxy cockroachdb
-```
-
-Currently the WEB UI is not exposed to an HTTP load-balancer (only postgres protocol connections over TCP are).
 
 # Known Issues
 

@@ -5,25 +5,26 @@ import sys
 sys.path.append('lib')  # noqa
 sys.path.append('src')  # noqa
 
-from charm import CockroachDBCharmEvents
-from cluster import CockroachDBCluster
 from ops import testing
-from ops.charm import CharmBase
+from ops.charm import CharmBase, CharmEvents
+from ops.framework import EventSource
+
+from cluster import CockroachDbCluster
+from db_instance_manager import ClusterInitializedEvent
 
 
-class TestCharmClass(CharmBase):
-    '''A test class that exposes the same set of events as the real CockroachDBCharm class.
+class TestCharmEvents(CharmEvents):
+    cluster_initialized = EventSource(ClusterInitializedEvent)
 
-    CockroachDBCluster type expects the parent to expose an event called cluster_initialized.
-    '''
 
-    on = CockroachDBCharmEvents()
+class TestCharm(CharmBase):
+    on = TestCharmEvents()
 
 
 class TestCockroachDBCluster(unittest.TestCase):
 
     def setUp(self):
-        self.harness = testing.Harness(TestCharmClass, meta='''
+        self.harness = testing.Harness(TestCharm, meta='''
             name: cockroachdb
             peers:
               cluster:
@@ -31,7 +32,11 @@ class TestCockroachDBCluster(unittest.TestCase):
         ''')
 
         self.harness.begin()
-        self.cluster = CockroachDBCluster(self.harness.charm, 'cluster')
+        self.cluster = CockroachDbCluster(self.harness.charm, 'cluster')
+        # A charm author is exptected to do that in the constructor so we mimic
+        # this here.
+        self.harness.framework.observe(self.harness.charm.on.cluster_initialized,
+                                       self.cluster.on_cluster_initialized)
 
     def test_is_cluster_joined(self):
         relation_id = self.harness.add_relation('cluster', 'cockroachdb')
@@ -90,19 +95,20 @@ class TestCockroachDBCluster(unittest.TestCase):
         self.assertEqual(app_data.get('cluster_id'), cluster_id)
         self.assertEqual(app_data.get('initial_unit'), self.harness.charm.unit.name)
 
-    def test_on_cluster_initialized_when_not_joined(self):
-        '''Test a scenario when an initial unit generates cluster state without a peer relation.
-
-        This situation occurs on versions of Juju that do not have relation-created hooks fired
-        before the start event.
-        '''
-        self.harness.set_leader()
-        self.assertFalse(self.cluster.is_cluster_initialized)
-
-        cluster_id = '449ce7de-faea-48f1-925b-198032fdacc4'
-        self.harness.charm.on.cluster_initialized.emit(cluster_id)
-        self.assertTrue(self.cluster.is_cluster_initialized)
-        self.assertTrue(self.cluster.stored.cluster_id, cluster_id)
+# TODO: uncomment this once https://github.com/canonical/operator/pull/196 is merged.
+#    def test_on_cluster_initialized_when_not_joined(self):
+#        '''Test a scenario when an initial unit generates cluster state without a peer relation.
+#
+#        This situation occurs on versions of Juju that do not have relation-created hooks fired
+#        before the start event.
+#        '''
+#        self.harness.set_leader()
+#        self.assertFalse(self.cluster.is_cluster_initialized)
+#
+#        cluster_id = '449ce7de-faea-48f1-925b-198032fdacc4'
+#        self.harness.charm.on.cluster_initialized.emit(cluster_id)
+#        self.assertTrue(self.cluster.is_cluster_initialized)
+#        self.assertTrue(self.cluster.stored.cluster_id, cluster_id)
 
     def test_on_cluster_initialized_not_leader(self):
         '''Test that the handler raises an exception if erroneously used from a non-leader unit.

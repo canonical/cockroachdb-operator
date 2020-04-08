@@ -7,18 +7,16 @@ min-juju-version: 2.7.5
 tags:
     - database
 provides:
-  db:
-    interface: pgsql
-    optional: true
-  proxy-listen-tcp:
-      interface: proxy-listen-tcp
+    db:
+        interface: pgsql
+        optional: true
 peers:
-  cluster:
-    interface: cockroachdb-peer
+    cluster:
+        interface: cockroachdb-peer
 series:
-   - bionic
+    - bionic
 resources:
-  cockroach-linux-amd64:
-    type: file
-    filename: cockroach.linux-amd64.tgz
-    description: An archive with a binary named "cockroach" as downloaded from https://binaries.cockroachdb.com/cockroach-<version>.linux-amd64.tgz
+    cockroach-linux-amd64:
+        type: file
+        filename: cockroach.linux-amd64.tgz
+        description: An archive with a binary named "cockroach" as downloaded from https://binaries.cockroachdb.com/cockroach-<version>.linux-amd64.tgz

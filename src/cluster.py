@@ -1,14 +1,13 @@
 from ops.framework import Object, StoredState
 
 
-class CockroachDBCluster(Object):
+class CockroachDbCluster(Object):
 
     stored = StoredState()
 
     def __init__(self, charm, relation_name):
         super().__init__(charm, relation_name)
         self._relation_name = relation_name
-        self.framework.observe(charm.on.cluster_initialized, self)
         self.stored.set_default(cluster_id=None)
 
     @property
